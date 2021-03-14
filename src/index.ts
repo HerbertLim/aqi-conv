@@ -1,8 +1,29 @@
+const d3Scale = require('d3-scale') // import not available
 import _ from 'lodash';
-//import d3 from 'd3-scale'; // doesn't work Jun 13, 2019.
-const d3Scale = require('d3-scale')
-
 import {aqiSpecs} from './aqiSpecs';
+
+export enum Aqi {
+    MISEBIG = 'misebig',
+    AIRY = 'misebig',
+    US = 'us',
+    KR = 'kr',
+}
+export enum Pollutant {
+    PM25 = 'pm25',
+    PM10 = 'pm10',
+    NO2 = 'no2',
+    O3 = 'o3',
+    CO = 'co',
+    SO2 = 'so2',
+}
+export type ConcValues = {
+    pm25Value: number;
+    pm10Value: number;
+    no2Value: number;
+    o3Value: number;
+    coValue: number;
+    so2Value: number;
+}
 
 const pNames = {
     PM25 : 'pm25',
@@ -13,26 +34,28 @@ const pNames = {
     SO2 : 'so2'     // ppb
 };
 
-export const hello = () => {
-    return 'hello w'
-}
+export const getIaqiFromConcs = (
+    aqiName: Aqi, 
+    {pm25Value, pm10Value, no2Value, o3Value, coValue, so2Value}: ConcValues
+): number => {
+    if (!Object.values(Aqi).includes(aqiName)) return -1;
 
-export const getIaqiFromConcs = (aqiName, {pm25Value, pm10Value, no2Value, o3Value, coValue, so2Value}) => {
-    let aqis = [];
-    aqis.push(getAqiFromConc(aqiName, pNames.PM25, pm25Value))
-    aqis.push(getAqiFromConc(aqiName, pNames.PM10, pm10Value))
-    aqis.push(getAqiFromConc(aqiName, pNames.NO2, no2Value))
-    aqis.push(getAqiFromConc(aqiName, pNames.O3, o3Value))
-    aqis.push(getAqiFromConc(aqiName, pNames.CO, coValue))
-    aqis.push(getAqiFromConc(aqiName, pNames.SO2, so2Value))
+    let aqis: number[] = [];
+    aqis.push(getAqiFromConc(aqiName, Pollutant.PM25, pm25Value))
+    aqis.push(getAqiFromConc(aqiName, Pollutant.PM10, pm10Value))
+    aqis.push(getAqiFromConc(aqiName, Pollutant.NO2, no2Value))
+    aqis.push(getAqiFromConc(aqiName, Pollutant.O3, o3Value))
+    aqis.push(getAqiFromConc(aqiName, Pollutant.CO, coValue))
+    aqis.push(getAqiFromConc(aqiName, Pollutant.SO2, so2Value))
 
     return _.max(aqis)
 }
 
-
-export const getAqiFromConc = (aqiName, pollutant, conc) => {
-    //if (conc == '' || conc == null ) return -1;
-
+export const getAqiFromConc = (
+    aqiName: Aqi, 
+    pollutant: Pollutant, 
+    conc: number
+): number => {
     const level = getLevelFromConc(aqiName, pollutant, conc)
     
     if (level === -1 || conc < 0) {
@@ -54,10 +77,13 @@ export const getAqiFromConc = (aqiName, pollutant, conc) => {
     aqi = bpLow + (conc - cLow)*(bpHigh - bpLow)/(cHigh - cLow)
     // console.log(`concToAqi: aqi:${aqi} = bpLow:${bpLow} + (conc:${conc} - cLow:${cLow})*bpHigh:${bpHigh}-bpLow:${bpLow})/(cHigh:${cHigh}-cLow:${cLow})`)
 
-    return Math.round(aqi,0);
+    return Math.round(aqi)
 }
 
-export const getPosInLevel = (aqiName, aqi) => {
+export const getPosInLevel = (
+    aqiName: Aqi, 
+    aqi: number
+): number => {
     if (aqiName === 'kr' && aqi > 150) {
         const hazardousPos = d3Scale.scaleLog()
                     .domain([151, 500, 2000])
@@ -84,7 +110,10 @@ export const getPosInLevel = (aqiName, aqi) => {
     return newPos; 
 }
 
-export const getLevelByAqi = (aqiName, aqiValue) => {
+export const getLevelByAqi = (
+    aqiName: Aqi, 
+    aqiValue: number
+): number => {
     if (aqiName === 'kr' && aqiValue > 150) return 3;
     if (aqiValue > 400) return 5;
 
@@ -96,7 +125,11 @@ export const getLevelByAqi = (aqiName, aqiValue) => {
     return level;
 }
 
-export const getLevelFromConc = (aqiName, pollutant, conc) => {
+export const getLevelFromConc = (
+    aqiName: Aqi, 
+    pollutant: Pollutant, 
+    conc: number
+): number => {
     if (!isValidPollutantName(pollutant)) return -1;
     if (!aqiSpecs[aqiName]) {
         // console.error(`getConcLevel: invalid AQI name:${aqiName}`)
@@ -121,7 +154,11 @@ export const getLevelFromConc = (aqiName, pollutant, conc) => {
     else return level;
 }
 
-export const getAqiBreakpoint = (aqiName, pollutant, level) => {
+export const getAqiBreakpoint = (
+    aqiName: Aqi, 
+    pollutant: Pollutant, 
+    level: number
+): number => {
     if (!isValidPollutantName(pollutant) ||
         !aqiSpecs[aqiName] ||
         level >= aqiSpecs[aqiName].level ) 
@@ -133,13 +170,17 @@ export const getAqiBreakpoint = (aqiName, pollutant, level) => {
 // Calculate AQI from concentration where AQI value is higher than 500
 // Official AQI value's highest limit is 500 but there are cases where AQI value is much higher the limit.
 // AQI above 501 is calculated by using the increase rate from AQI 401 to 500 of each pollutant.
-const concToAqiLast = (aqiName, pollutant, conc) => {
+const concToAqiLast = (
+    aqiName: Aqi, 
+    pollutant: Pollutant, 
+    conc: number
+): number => {
     if (!aqiSpecs[aqiName]) return -1;
 
     const {slope, intercept} = aqiSpecs[aqiName][pollutant+'Data'];
     const aqi = slope * conc + intercept;
 
-    if (Number(aqi)) return Math.round(aqi, 0)
+    if (Number(aqi)) return Math.round(aqi)
     else return -1;
 }
 
@@ -183,34 +224,3 @@ function getCHigh(aqiName, pollutant, level) {
 function isValidPollutantName(pollutant) {
     return _.includes(pNames, pollutant)
 }
-
-function isValidConcValue(conc) {
-    if (conc < 0 || conc == null || conc == '-') return false;
-    else return true;
-}
-
-function getAqiLevel(pollutant, aqi) {
-    if (!isValidAqi(aqi)) return -1;
-    
-    let level = -1;
-    let i = 0;
-    for (i = 0; i < 6; i++) {
-        if (aqi <= aqiStd.indexBp[i]) {
-            level = i;
-            break;
-        }
-    }
-    if (i == 6) {
-        if (plt == pollutant.PM10) level = 6;
-        else level = 5;
-    }
-    return level;
-}
-
-
-function isValidAqi(aqi) {
-    // Valid AQI value range is 0~500.
-    //if (aqi < 0 || aqi > 501) return false;
-    if (Number(aqi) < 0 ) return false;
-    else return true;
-}  
